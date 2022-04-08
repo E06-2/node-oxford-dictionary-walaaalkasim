@@ -2,7 +2,7 @@ require("dotenv").config();
 //console.log(process.env);
 const axios = require("axios");
 
-const word = process.argv.slice(2); //use npm index.js happy///or any word you want
+const word = process.argv.slice(2).join(" ");
 const app_key = process.env.APP_KEY;
 const app_id = process.env.APP_ID;
 
@@ -22,15 +22,13 @@ const treatResponse = ({ data }) => {
 
   const usage = results.reduce(treatCategory, "")
 
-  console.log(`Definitions of "${word}", as provided by ${metadata.provider}`);
-  console.log(usage);
+  console.log(`\n-----\nDefinitions of "${word}", as provided by ${metadata.provider}`);
+  console.log(usage, "\n-----\n");
 
 }
 
 
 const treatCategory = (text, categoryData) => {
-  // console.log("**************\ncategoryData:", categoryData);
-
   const { lexicalEntries } = categoryData
 
   return text + lexicalEntries.reduce(treatLexicalEntry, "-----\n")
@@ -38,12 +36,10 @@ const treatCategory = (text, categoryData) => {
 
 
 const treatLexicalEntry = ( text, lexicalEntry ) => {
-  // console.log("************\nlexicalEntry:", lexicalEntry);
-
   const { entries, lexicalCategory } = lexicalEntry
 
-
   return text
+      + "\n"
       + lexicalCategory.text
       + entries.reduce(treatEntry, "\n")
 
@@ -51,18 +47,13 @@ const treatLexicalEntry = ( text, lexicalEntry ) => {
 
 
 const treatEntry = ( text, entry ) => {
-  // console.log("**********\nentry:", entry);
-
-  const { senses } = entry
+  const { senses=[] } = entry // prevents error for "so"
 
   return text + senses.reduce(treatSense, "\n")
-
 }
 
 
 const treatSense = ( text, sense, index ) => {
-  // console.log("********\nsense:", sense);
-
   const { definitions } = sense
   const definition = (definitions.length === 1)
   ? definitions[0]
@@ -73,14 +64,42 @@ const treatSense = ( text, sense, index ) => {
 
 
 const treatDefinition = ( text, definition, index ) => {
-  // console.log("*****\sdefinition:", definition);
-
   return `${text}  ${index + 1}. ${definition}\n`
 }
 
 
 const treatError = (error) => {
-  console.log(error);
+  if ( error.response ) {
+    // axios error
+    const { response } = error
+    const { status, statusText } = response
+
+    switch (status) {
+      case 404:
+        console.log(`⚠\nERROR ${status}: "${word}" ${statusText}⚠`)
+        console.log("Please check your spelling\n⚠")
+      break
+      case 400:
+      case 403:
+        console.log(`⚠\nERROR ${status}: ${statusText}\nCheck the APP_KEY and APP_ID in your .env file.\n⚠`)
+      break
+      default:
+        console.log(`⚠\nERROR ${status} for "${word}": ${statusText}\n⚠`)
+    }
+
+  } else {
+    switch (error.code) {
+      case 'ERR_HTTP_INVALID_HEADER_VALUE':
+        console.log(`⚠\nERROR: ${error.message}`)
+        console.log
+        ("Check that you have correctly created the .env file.")
+        console.log("Get your own key and id here: https://developer.oxforddictionaries.com\n⚠")
+      break
+      default:
+        // script error
+        console.log(error);
+    }
+  }
 }
 
 
